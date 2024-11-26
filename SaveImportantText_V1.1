@@ -1,0 +1,110 @@
+import os
+from datetime import datetime, timedelta
+import tkinter as tk
+from tkinter import messagebox
+import pyperclip
+import subprocess
+
+
+# Global variable to store the last clipboard content
+last_clipboard_content = ""
+
+
+def save_text_to_file(text, filename):
+    try:
+        with open(filename, 'a', encoding='utf-8') as file:
+            if os.stat(filename).st_size != 0:  # Check if file is empty
+                file.write('\n')  # Add new line if file is not empty
+            file.write(text + '\n')  # Add text content
+            file.write('-' * 50 + '\n')  # Add horizontal line
+    except Exception as e:
+        messagebox.showerror("保存失败", f"保存文件时出错: {e}")
+
+
+def save_text(text_entry):
+    content = text_entry.get("1.0", "end-1c")
+    if content:
+        today = datetime.now().strftime("%Y-%m-%d")
+        filename = f"./daily_notes/{today}.txt"
+        save_text_to_file(content, filename)
+        text_entry.delete("1.0", "end")
+    else:
+        messagebox.showwarning("输入不完整", "请填写文本内容！")
+
+
+def open_save_path():
+    save_path = "./daily_notes"  # 更改为你的保存路径
+    subprocess.Popen(['explorer', os.path.abspath(save_path)], shell=True)
+
+
+def delete_last_week_files(base_dir):
+    today = datetime.now()
+    last_week = today - timedelta(days=7)
+    last_week_files = os.listdir(base_dir)
+    deleted_files = []
+    for file in last_week_files:
+        file_date = datetime.strptime(file[:-4], "%Y-%m-%d")  # Removing '.txt' extension
+        if file_date < last_week:
+            file_path = os.path.join(base_dir, file)
+            if os.path.isfile(file_path):
+                try:
+                    os.remove(file_path)
+                    deleted_files.append(file_path)
+                except Exception as e:
+                    print(f"删除文件时出错: {e}")
+    if deleted_files:
+        deleted_files_str = '\n'.join(deleted_files)
+        messagebox.showinfo("删除成功", f"已删除上周的以下文档:\n{deleted_files_str}")
+    else:
+        messagebox.showinfo("无需删除", "上周没有文档需要删除！")
+
+
+def add_clipboard_text(text_entry):
+    clipboard_content = pyperclip.paste()
+    if clipboard_content:
+        text_entry.insert("end", clipboard_content + '\n')
+
+
+def clear_text_entry(text_entry):
+    text_entry.delete("1.0", "end")
+
+
+def main():
+    root = tk.Tk()
+    root.title("每日文本内容保存工具")
+
+    text_label = tk.Label(root, text="文本内容：")
+    text_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+
+    text_entry = tk.Text(root, width=60, height=10)
+    text_entry.grid(row=0, column=1, padx=5, pady=5, columnspan=2)
+
+    # Add vertical scrollbar
+    scrollbar = tk.Scrollbar(root, orient="vertical", command=text_entry.yview)
+    scrollbar.grid(row=0, column=3, padx=5, pady=5, sticky="ns")
+    text_entry.config(yscrollcommand=scrollbar.set)
+
+    save_button = tk.Button(root, text="保存", width=40, command=lambda: save_text(text_entry))
+    save_button.grid(row=1, column=0, padx=5, pady=5, columnspan=2)
+
+    # Add button to update clipboard content
+    clipboard_button = tk.Button(root, text="添加剪贴板内容", command=lambda: add_clipboard_text(text_entry))
+    clipboard_button.grid(row=1, column=2, padx=5, pady=5)
+
+    clear_button = tk.Button(root, text="清空文本框", bg="blue", fg="white", command=lambda: clear_text_entry(text_entry))
+    clear_button.grid(row=1, column=3, padx=5, pady=5, columnspan=2)
+
+    open_dir_button = tk.Button(root, text="打开保存路径", command=open_save_path)
+    open_dir_button.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
+
+    delete_button = tk.Button(root, text="删除上周文档", bg="red", fg="white", command=lambda: delete_last_week_files("./daily_notes"))
+    delete_button.grid(row=3, column=0, padx=5, pady=5)
+
+    delete_label = tk.Label(root, text="点击此按钮删除上周的文档")
+    delete_label.grid(row=3, column=1, padx=5, pady=5, sticky="w")
+
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
