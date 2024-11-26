@@ -1,0 +1,144 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import opencc
+import re
+import os
+
+
+def convert_to_traditional(input_file, output_file, add_live_prefix, remove_parentheses, phrases_to_remove,
+                           remove_company, output_traditional, add_empty_line, add_url_prefix):
+    # 初始化繁体中文转换器
+    converter = opencc.OpenCC('s2hk.json')
+
+    # 季度替换规则
+    quarter_replacements = {
+        "第一季度": "Q1",
+        "第二季度": "Q2",
+        "第三季度": "Q3",
+        "第四季度": "Q4",
+        "第一财季": "Q1",
+        "第二财季": "Q2",
+        "第三财季": "Q3",
+        "第四财季": "Q4"
+    }
+
+    # 将指定词组转换为列表
+    phrases_to_remove_list = [phrase.strip() for phrase in phrases_to_remove.split(',') if phrase.strip()]
+
+    url_prefix = "https://www.hstong.com/sns/live/detail/"
+
+    with open(input_file, 'r', encoding='utf-8') as infile, open(output_file, 'w', encoding='utf-8') as outfile:
+        for line in infile:
+            modified_line = line.strip()
+
+            # 在每行前面加上“【直播】”
+            if add_live_prefix:
+                modified_line = "【直播】" + modified_line
+
+            # 替换季度标识
+            for cn_quarter, en_quarter in quarter_replacements.items():
+                modified_line = re.sub(cn_quarter, en_quarter, modified_line)
+
+            # 删除“公司”两个字
+            if remove_company:
+                modified_line = re.sub("公司", "", modified_line)
+
+            # 删除括号及其内部所有字符
+            if remove_parentheses:
+                modified_line = re.sub(r"\(.*?\)", "", modified_line)  # 删除英文括号及其内容
+                modified_line = re.sub(r"（.*?）", "", modified_line)  # 删除中文括号及其内容
+
+            # 删除指定的词组
+            for phrase in phrases_to_remove_list:
+                modified_line = modified_line.replace(phrase, "")
+
+            # 在17位数字前加上URL前缀
+            if add_url_prefix:
+                modified_line = re.sub(r'\b(\d{17})\b', url_prefix + r'\1', modified_line)
+
+            # 写入原始修改后的文本
+            outfile.write(modified_line + '\n')
+
+            # 写入繁体中文
+            if output_traditional:
+                traditional_line = converter.convert(modified_line)
+                outfile.write(traditional_line + '\n')
+
+            # 写入空行
+            if add_empty_line:
+                outfile.write('\n')
+
+
+def select_input_file():
+    file_path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+    input_file_var.set(file_path)
+
+
+def start_conversion():
+    input_file = input_file_var.get()
+    output_file = "output.txt"  # 将输出文件名设为output.txt，保存在当前工作目录
+
+    if not input_file:
+        messagebox.showwarning("警告", "请选择输入文件")
+        return
+
+    add_live_prefix = add_live_prefix_var.get()
+    remove_parentheses = remove_parentheses_var.get()
+    phrases_to_remove = phrases_to_remove_var.get()
+    remove_company = remove_company_var.get()
+    output_traditional = output_traditional_var.get()
+    add_empty_line = add_empty_line_var.get()
+    add_url_prefix = add_url_prefix_var.get()
+
+    try:
+        convert_to_traditional(input_file, output_file, add_live_prefix, remove_parentheses, phrases_to_remove,
+                               remove_company, output_traditional, add_empty_line, add_url_prefix)
+        messagebox.showinfo("完成", f"转换完成，结果已保存到 {os.path.abspath(output_file)}")
+    except Exception as e:
+        messagebox.showerror("错误", f"转换失败: {e}")
+
+
+# 创建主窗口
+root = tk.Tk()
+root.title("文本转换工具")
+
+# 输入文件选择
+input_file_var = tk.StringVar()
+
+tk.Label(root, text="选择输入文件:").grid(row=0, column=0, padx=10, pady=10)
+tk.Entry(root, textvariable=input_file_var, width=50).grid(row=0, column=1, padx=10, pady=10)
+tk.Button(root, text="浏览", command=select_input_file).grid(row=0, column=2, padx=10, pady=10)
+
+# 添加复选框和文本框
+add_live_prefix_var = tk.BooleanVar()
+tk.Checkbutton(root, text="在前面添加【直播】", variable=add_live_prefix_var).grid(row=1, column=0, columnspan=3, pady=5)
+
+remove_parentheses_var = tk.BooleanVar()
+tk.Checkbutton(root, text="删除括号及其内部字符", variable=remove_parentheses_var).grid(row=2, column=0, columnspan=3,
+                                                                                        pady=5)
+
+remove_company_var = tk.BooleanVar()
+tk.Checkbutton(root, text="删除“公司”两个字", variable=remove_company_var).grid(row=3, column=0, columnspan=3, pady=5)
+
+output_traditional_var = tk.BooleanVar(value=True)  # 默认勾选
+tk.Checkbutton(root, text="输出繁体中文", variable=output_traditional_var).grid(row=4, column=0, columnspan=3, pady=5)
+
+add_empty_line_var = tk.BooleanVar(value=True)  # 默认勾选
+tk.Checkbutton(root, text="写入空行", variable=add_empty_line_var).grid(row=6, column=0, columnspan=3, pady=5)
+
+add_url_prefix_var = tk.BooleanVar()
+tk.Checkbutton(root, text="生成直播链接（确保输入了直播ID，应关闭输出繁体中文）", variable=add_url_prefix_var).grid(row=7, column=0, columnspan=3,
+                                                                                       pady=5)
+
+tk.Label(root, text="去除指定词组（用逗号分隔）:").grid(row=8, column=0, padx=10, pady=10)
+phrases_to_remove_var = tk.StringVar()
+tk.Entry(root, textvariable=phrases_to_remove_var, width=50).grid(row=8, column=1, padx=10, pady=10)
+
+# 转换按钮
+tk.Button(root, text="开始转换", command=start_conversion).grid(row=9, column=0, columnspan=3, pady=20)
+
+# 运行主循环
+root.mainloop()
+
+
+
