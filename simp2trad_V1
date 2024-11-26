@@ -1,0 +1,82 @@
+import tkinter as tk
+from tkinter import ttk
+import opencc
+
+
+def convert_text():
+    # Get input text and selected conversion type
+    text = input_text.get("1.0", tk.END).strip()
+    conversion_type = conversion_var.get()
+
+    # Map conversion types to OpenCC config
+    conversion_options = {
+        '香港繁体': 's2hk',  # Simplified Chinese to Traditional Chinese (Hong Kong standard)
+        '台湾繁体': 's2tw',  # Simplified Chinese to Traditional Chinese (Taiwan standard)
+        '通用繁体': 's2t',   # Simplified Chinese to General Traditional Chinese
+        '简体中文': 't2s',    # Traditional Chinese to Simplified Chinese
+    }
+
+    # Perform conversion if input is valid
+    if conversion_type in conversion_options:
+        converter = opencc.OpenCC(conversion_options[conversion_type])
+        converted = converter.convert(text)
+
+        # Check if the "添加【直播】" checkbox is selected
+        # if add_live_var.get():
+        #     converted = f"【直播】{converted}"
+
+        output_text.delete("1.0", tk.END)
+        output_text.insert(tk.END, converted)
+
+
+# Initialize the main window
+root = tk.Tk()
+root.title("简繁转换工具")
+
+# Configure grid weights for responsiveness
+root.grid_rowconfigure(1, weight=1)  # Input text area
+root.grid_rowconfigure(6, weight=1)  # Output text area
+for i in range(5):
+    root.grid_columnconfigure(i, weight=1)  # All columns will expand equally
+
+# Input text area
+input_label = ttk.Label(root, text="从原文:")
+input_label.grid(row=0, column=0, sticky='w', padx=10, pady=10)
+input_text = tk.Text(root, height=10, width=70)
+input_text.grid(row=1, column=0, columnspan=5, sticky='nsew', padx=10)
+
+# Conversion options (radio buttons) in one row
+conversion_label = ttk.Label(root, text="转换为:")
+conversion_label.grid(row=2, column=0, sticky='w', padx=10, pady=10)
+
+conversion_var = tk.StringVar(value="香港繁体")  # Default value
+
+radio_hk = ttk.Radiobutton(root, text='香港繁体', variable=conversion_var, value='香港繁体')
+radio_hk.grid(row=2, column=1, sticky='w', padx=5)
+
+radio_tw = ttk.Radiobutton(root, text='台湾繁体', variable=conversion_var, value='台湾繁体')
+radio_tw.grid(row=2, column=2, sticky='w', padx=5)
+
+radio_general = ttk.Radiobutton(root, text='通用繁体', variable=conversion_var, value='通用繁体')
+radio_general.grid(row=2, column=3, sticky='w', padx=5)
+
+radio_simplified = ttk.Radiobutton(root, text='简体中文', variable=conversion_var, value='简体中文')
+radio_simplified.grid(row=2, column=4, sticky='w', padx=5)
+
+# Add a checkbox for "添加【直播】"
+# add_live_var = tk.BooleanVar()  # Variable for checkbox state
+# add_live_checkbox = ttk.Checkbutton(root, text='添加【直播】', variable=add_live_var)
+# add_live_checkbox.grid(row=3, column=0, sticky='w', padx=10, pady=10)
+
+# Convert button
+convert_button = ttk.Button(root, text="转换", command=convert_text)
+convert_button.grid(row=4, column=0, columnspan=5, pady=10)
+
+# Output text area
+output_label = ttk.Label(root, text="转换结果:")
+output_label.grid(row=5, column=0, sticky='w', padx=10, pady=10)
+output_text = tk.Text(root, height=10, width=70)
+output_text.grid(row=6, column=0, columnspan=5, sticky='nsew', padx=10, pady=(0, 20))  # Add bottom padding
+
+# Run the GUI loop
+root.mainloop()
