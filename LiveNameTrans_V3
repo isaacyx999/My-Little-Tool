@@ -1,0 +1,155 @@
+import pandas as pd
+import re
+import opencc
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
+# 初始化 opencc 转换器
+converter = opencc.OpenCC('s2t')  # s2t 表示简体到繁体的转换
+
+# 季度替换规则
+quarter_replacements = {
+    "第一季度": "Q1",
+    "第二季度": "Q2",
+    "第三季度": "Q3",
+    "第四季度": "Q4",
+    "第一财季": "Q1",
+    "第二财季": "Q2",
+    "第三财季": "Q3",
+    "第四财季": "Q4"
+}
+
+
+# 生成直播链接
+def generate_live_link(live_id):
+    return f"https://www.hstong.com/sns/live/detail/{live_id}"
+
+
+# 处理直播标题
+def modify_title(title, add_prefix, remove_brackets, remove_company, replace_quarters):
+    if add_prefix:
+        title = f"【直播】{title}"
+    if remove_brackets:
+        title = re.sub(r"\(.*?\)", "", title)
+    if remove_company:
+        title = title.replace("公司", "")
+    if replace_quarters:
+        for key, value in quarter_replacements.items():
+            title = title.replace(key, value)
+    return title
+
+
+# 处理日期和时间格式
+def modify_datetime(datetime_str):
+    try:
+        datetime_obj = pd.to_datetime(datetime_str)
+        return datetime_obj.strftime("%m/%d %H:%M")
+    except:
+        return ""
+
+
+# 选择文件
+def load_file():
+    global file_path
+    file_path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx;*.xls")])
+    if file_path:
+        file_label.config(text=f"已选择文件: {file_path.split('/')[-1]}")
+    else:
+        messagebox.showwarning("警告", "未选择文件。")
+
+
+# 处理数据
+def process_data():
+    if not file_path:
+        messagebox.showerror("错误", "请先选择文件。")
+        return
+    try:
+        # 加载文件
+        df = pd.read_excel(file_path)
+        required_columns = ['直播ID', '直播原标题', '播放时间']
+        if not all(col in df.columns for col in required_columns):
+            messagebox.showerror("错误", f"文件缺少必要列，请确保包含以下列名: {', '.join(required_columns)}")
+            return
+
+        # 处理 A 列：生成直播链接
+        df['直播ID'] = df['直播ID'].apply(generate_live_link)
+
+        # 处理 B 列并生成新列
+        df['修改后的标题（简体）'] = df['直播原标题'].apply(lambda title: modify_title(
+            title,
+            add_prefix_var.get(),
+            remove_brackets_var.get(),
+            remove_company_var.get(),
+            replace_quarters_var.get()
+        ))
+
+        if convert_traditional_var.get():
+            df['修改后的标题（繁体）'] = df['修改后的标题（简体）'].apply(converter.convert)
+
+        # 处理 C 列：修改日期和时间格式
+        df['播放时间'] = df['播放时间'].apply(modify_datetime)
+
+        # 保存修改后的文件
+        save_file(df)
+    except Exception as e:
+        messagebox.showerror("错误", f"处理数据时出错: {e}")
+
+
+# 保存修改后的文件
+def save_file(df):
+    default_filename = "处理后的文件.xlsx"  # 默认文件名
+    save_path = filedialog.asksaveasfilename(
+        defaultextension=".xlsx",
+        filetypes=[("Excel Files", "*.xlsx")],
+        initialfile=default_filename  # 设置默认文件名
+    )
+    if save_path:
+        try:
+            df.to_excel(save_path, index=False)
+            messagebox.showinfo("成功", "文件已成功保存！")
+        except Exception as e:
+            messagebox.showerror("错误", f"保存文件时出错: {e}")
+
+
+# 创建GUI界面
+def create_gui():
+    global file_label, add_prefix_var, remove_brackets_var, remove_company_var, convert_traditional_var, replace_quarters_var, file_path
+    file_path = ""
+
+    window = tk.Tk()
+    window.title("Excel 处理程序")
+    window.geometry("400x400")
+
+    # 文件选择部分
+    file_frame = tk.Frame(window)
+    file_frame.pack(pady=10)
+    tk.Button(file_frame, text="选择Excel文件", command=load_file, width=20).pack(side="left", padx=5)
+    file_label = tk.Label(file_frame, text="未选择文件", fg="red")
+    file_label.pack(side="left")
+
+    # 配置选项区域
+    options_frame = tk.LabelFrame(window, text="处理选项", padx=10, pady=10)
+    options_frame.pack(padx=10, pady=10, fill="x")
+
+    add_prefix_var = tk.BooleanVar(value=False)
+    remove_brackets_var = tk.BooleanVar(value=False)
+    remove_company_var = tk.BooleanVar(value=False)
+    convert_traditional_var = tk.BooleanVar(value=False)
+    replace_quarters_var = tk.BooleanVar(value=False)
+
+    tk.Checkbutton(options_frame, text="添加“【直播】”前缀", variable=add_prefix_var).pack(anchor="w")
+    tk.Checkbutton(options_frame, text="删除括号及内部内容", variable=remove_brackets_var).pack(anchor="w")
+    tk.Checkbutton(options_frame, text="删除“公司”两个字(注：勾选后要检查）", variable=remove_company_var).pack(anchor="w")
+    tk.Checkbutton(options_frame, text="替换季度文本（Q1, Q2...）", variable=replace_quarters_var).pack(anchor="w")
+    tk.Checkbutton(options_frame, text="转换为繁体中文", variable=convert_traditional_var).pack(anchor="w")
+
+    # 开始处理按钮
+    process_button = tk.Button(window, text="开始处理并保存文件", command=process_data, width=30, height=2)
+    process_button.pack(pady=20)
+
+    window.mainloop()
+
+
+# 启动程序
+if __name__ == "__main__":
+    create_gui()
